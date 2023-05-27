@@ -1,4 +1,4 @@
-package com.example.screensharetest
+package com.example.screensharetest.service.screenrecord
 
 import android.app.Activity
 import android.app.Notification
@@ -11,15 +11,20 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.os.Environment
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.screensharetest.R
+import com.example.screensharetest.TAG
+import java.io.File
 
 class ScreenCaptureForegroundService : Service() {
-    private var virtualDisplay: VirtualDisplay? = null
-    private var mediaProjection: MediaProjection? = null
+
+    private var recordHandler: RecordHandler? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -34,55 +39,26 @@ class ScreenCaptureForegroundService : Service() {
 
                 val resultCode = intent.getIntExtra(RESULT_CODE_KEY, Activity.RESULT_CANCELED)
                 val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
-                mediaProjection =
-                    mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
+                val mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
 
-                mediaProjection?.registerCallback(
-                    object : MediaProjection.Callback() {
-                        override fun onStop() {
-                            virtualDisplay?.release()
-                            Log.d(TAG, "MediaProjection.onStop()")
-                        }
-                    },
-                    Handler(Looper.myLooper()!!)
+                val handlerThread = HandlerThread("record handler")
+                handlerThread.start()
+
+                this.recordHandler = RecordHandler(
+                    handlerThread.looper,
+                    mediaProjection,
+                    resources.displayMetrics.densityDpi,
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + File.separator + "recorded.mp4"
                 )
-
-                val metrics = resources.displayMetrics
-
-                virtualDisplay = mediaProjection?.createVirtualDisplay(
-                    "Screen 1",
-                    metrics.widthPixels,
-                    metrics.heightPixels,
-                    metrics.densityDpi,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                    null,
-                    object : VirtualDisplay.Callback() {
-                        override fun onStopped() {
-                            Log.d(TAG, "VirtualDisplay.onStop()")
-                        }
-
-                        override fun onPaused() {
-                            Log.d(TAG, "VirtualDisplay.onPaused()")
-                        }
-
-                        override fun onResumed() {
-                            Log.d(TAG, "VirtualDisplay.onResumed()")
-                        }
-                    },
-                    null
-                )
+                this.recordHandler?.handleMessage(RecordHandler.startMessage())
 
                 return START_STICKY
             }
 
             STOP_RECORDING_INTENT_ACTION -> {
-                mediaProjection?.stop()
-                virtualDisplay?.release()
+                this.recordHandler?.handleMessage(RecordHandler.stopMessage())
 
-                mediaProjection = null
-                virtualDisplay = null
-
-                stopSelf()
+                //stopSelf()
                 return START_NOT_STICKY
             }
 

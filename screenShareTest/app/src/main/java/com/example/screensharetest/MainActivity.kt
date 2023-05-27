@@ -3,17 +3,13 @@ package com.example.screensharetest
 import android.media.projection.MediaProjectionManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.SurfaceView
 import android.widget.Button
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-
-const val TAG = "ScreenShare"
-
+import com.example.screensharetest.service.screenrecord.ScreenCaptureForegroundService
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var surfaceView: SurfaceView
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
     private lateinit var mediaProjectionManager: MediaProjectionManager
@@ -23,7 +19,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        this.surfaceView = findViewById(R.id.surface_view)
         this.startButton = findViewById(R.id.start_button)
         this.stopButton = findViewById(R.id.stop_button)
 
