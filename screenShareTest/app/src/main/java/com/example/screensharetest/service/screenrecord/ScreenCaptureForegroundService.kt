@@ -35,7 +35,6 @@ class ScreenCaptureForegroundService : Service() {
                 val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
                 val mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
 
-
                 recordThread.start()
 
                 this.recordHandler = RecordHandler(
