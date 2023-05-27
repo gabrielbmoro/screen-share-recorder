@@ -7,19 +7,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.hardware.display.DisplayManager
-import android.hardware.display.VirtualDisplay
-import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Environment
-import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.screensharetest.R
-import com.example.screensharetest.TAG
 import java.io.File
 
 class ScreenCaptureForegroundService : Service() {
@@ -47,8 +40,8 @@ class ScreenCaptureForegroundService : Service() {
                 this.recordHandler = RecordHandler(
                     handlerThread.looper,
                     mediaProjection,
-                    resources.displayMetrics.densityDpi,
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + File.separator + "recorded.mp4"
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + File.separator + "recorded.mp4",
+                    resources.displayMetrics
                 )
                 this.recordHandler?.handleMessage(RecordHandler.startMessage())
 

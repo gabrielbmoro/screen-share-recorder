@@ -10,13 +10,14 @@ import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
+import android.util.DisplayMetrics
 import android.view.Surface
 
 class RecordHandler(
     looper: Looper,
     private val mediaProjection: MediaProjection,
-    private val densityDpi: Int,
     private val outputFile: String,
+    private val displayMetrics: DisplayMetrics,
 ) : Handler(looper) {
 
     private var mediaCodec: MediaCodec? = null
@@ -34,8 +35,8 @@ class RecordHandler(
         // Configure the MediaFormat for video encoding
         val mediaFormat = MediaFormat.createVideoFormat(
             MediaFormat.MIMETYPE_VIDEO_AVC,
-            DISPLAY_WIDTH,
-            DISPLAY_HEIGHT
+            displayMetrics.widthPixels,
+            displayMetrics.heightPixels
         )
         mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 5_000_000)
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 30)
@@ -66,9 +67,9 @@ class RecordHandler(
 
                     virtualDisplay = mediaProjection.createVirtualDisplay(
                         "virtual display",
-                        DISPLAY_WIDTH,
-                        DISPLAY_HEIGHT,
-                        densityDpi,
+                        displayMetrics.widthPixels,
+                        displayMetrics.heightPixels,
+                        displayMetrics.densityDpi,
                         DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                         surface,
                         null,
@@ -133,8 +134,6 @@ class RecordHandler(
     companion object {
         private const val START_RECORD_MESSAGE = 0
         private const val STOP_RECORD_MESSAGE = 1
-        private const val DISPLAY_WIDTH = 1280
-        private const val DISPLAY_HEIGHT = 720
 
         fun startMessage() = Message().apply {
             what = START_RECORD_MESSAGE
