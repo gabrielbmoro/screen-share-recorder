@@ -16,47 +16,40 @@ import android.view.Surface
 class RecordHandler(
     looper: Looper,
     private val mediaProjection: MediaProjection,
-    private val outputFile: String,
+    outputFile: String,
     private val displayMetrics: DisplayMetrics,
 ) : Handler(looper) {
 
-    private var mediaCodec: MediaCodec? = null
-    private var mediaMuxer: MediaMuxer? = null
-    private var bufferInfo: MediaCodec.BufferInfo? = null
+    private val mediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+    private val mediaFormat = MediaFormat.createVideoFormat(
+        MediaFormat.MIMETYPE_VIDEO_AVC,
+        displayMetrics.widthPixels,
+        displayMetrics.heightPixels
+    ).apply {
+        setInteger(MediaFormat.KEY_BIT_RATE, 5_000_000)
+        setInteger(MediaFormat.KEY_FRAME_RATE, 30)
+        setInteger(
+            MediaFormat.KEY_COLOR_FORMAT,
+            MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        )
+        setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+    }
+    private val mediaMuxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private val bufferInfo = MediaCodec.BufferInfo()
 
     private var surface: Surface? = null
 
     private var virtualDisplay: VirtualDisplay? = null
 
     private fun setupMediaCodec() {
-        // Create a MediaCodec encoder
-        mediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-
-        // Configure the MediaFormat for video encoding
-        val mediaFormat = MediaFormat.createVideoFormat(
-            MediaFormat.MIMETYPE_VIDEO_AVC,
-            displayMetrics.widthPixels,
-            displayMetrics.heightPixels
-        )
-        mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 5_000_000)
-        mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 30)
-        mediaFormat.setInteger(
-            MediaFormat.KEY_COLOR_FORMAT,
-            MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
-        )
-        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-
         // Configure the MediaCodec encoder with the MediaFormat
-        mediaCodec!!.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-
-        // Create a mediaMuxer to write the encoded data
-        mediaMuxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
 
         // Create a surface from the MediaCodec encoder
-        surface = mediaCodec!!.createInputSurface()
+        surface = mediaCodec.createInputSurface()
 
         // Start the MediaCodec encoder
-        mediaCodec!!.start()
+        mediaCodec.start()
     }
 
     override fun handleMessage(msg: Message) {
@@ -80,9 +73,11 @@ class RecordHandler(
             }
 
             STOP_RECORD_MESSAGE -> {
-                mediaCodec!!.signalEndOfInputStream()
+                mediaCodec.signalEndOfInputStream()
                 mediaProjection.stop()
                 virtualDisplay?.release()
+                virtualDisplay = null
+                surface = null
             }
         }
     }
@@ -91,38 +86,36 @@ class RecordHandler(
     private fun recordSurface() {
         var videoTrackIndex: Int? = null
 
-        bufferInfo = MediaCodec.BufferInfo()
-
         while (true) {
-            val encoderStatus = mediaCodec?.dequeueOutputBuffer(bufferInfo!!, -1)
+            val encoderStatus = mediaCodec.dequeueOutputBuffer(bufferInfo, -1)
             when {
+                // No output available yet, wait for the next buffer
                 encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    // No output available yet, wait for the next buffer
                     continue
                 }
 
+                // The format of the output has changed (e.g., for the first frame), get the new format
                 encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    // The format of the output has changed (e.g., for the first frame), get the new format
-                    val newFormat = mediaCodec!!.outputFormat
-                    videoTrackIndex = mediaMuxer!!.addTrack(newFormat)
-                    mediaMuxer!!.start()
+                    val newFormat = mediaCodec.outputFormat
+                    videoTrackIndex = mediaMuxer.addTrack(newFormat)
+                    mediaMuxer.start()
                 }
 
-                (encoderStatus != null && encoderStatus >= 0) -> {
-                    // Encode and write the buffer to the MediaMuxer
-                    mediaCodec!!.getOutputBuffer(encoderStatus)?.let { encodedData ->
-                        encodedData.position(bufferInfo!!.offset)
-                        encodedData.limit(bufferInfo!!.offset + bufferInfo!!.size)
-                        mediaMuxer!!.writeSampleData(videoTrackIndex!!, encodedData, bufferInfo!!)
+                // Encode and write the buffer to the MediaMuxer
+                (encoderStatus >= 0) -> {
+                    mediaCodec.getOutputBuffer(encoderStatus)?.let { encodedData ->
+                        encodedData.position(bufferInfo.offset)
+                        encodedData.limit(bufferInfo.offset + bufferInfo.size)
+                        mediaMuxer.writeSampleData(videoTrackIndex!!, encodedData, bufferInfo)
                     }
 
-                    mediaCodec!!.releaseOutputBuffer(encoderStatus, false)
+                    mediaCodec.releaseOutputBuffer(encoderStatus, false)
 
-                    if ((bufferInfo!!.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        mediaCodec!!.stop()
-                        mediaCodec!!.release()
-                        mediaMuxer!!.stop()
-                        mediaMuxer!!.release()
+                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        mediaCodec.stop()
+                        mediaCodec.release()
+                        mediaMuxer.stop()
+                        mediaMuxer.release()
                         return
                     }
                 }

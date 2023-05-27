@@ -18,6 +18,7 @@ import java.io.File
 class ScreenCaptureForegroundService : Service() {
 
     private var recordHandler: RecordHandler? = null
+    private val recordThread: HandlerThread = HandlerThread("record handler")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -34,11 +35,11 @@ class ScreenCaptureForegroundService : Service() {
                 val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
                 val mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
 
-                val handlerThread = HandlerThread("record handler")
-                handlerThread.start()
+
+                recordThread.start()
 
                 this.recordHandler = RecordHandler(
-                    handlerThread.looper,
+                    recordThread.looper,
                     mediaProjection,
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + File.separator + "recorded.mp4",
                     resources.displayMetrics
@@ -51,7 +52,7 @@ class ScreenCaptureForegroundService : Service() {
             STOP_RECORDING_INTENT_ACTION -> {
                 this.recordHandler?.handleMessage(RecordHandler.stopMessage())
 
-                //stopSelf()
+                stopSelf()
                 return START_NOT_STICKY
             }
 
@@ -77,6 +78,10 @@ class ScreenCaptureForegroundService : Service() {
 
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
+
+        recordThread.quitSafely()
+        recordHandler = null
+
         super.onDestroy()
     }
 
