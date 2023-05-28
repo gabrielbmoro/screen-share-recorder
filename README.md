@@ -1,5 +1,7 @@
 # Screen Share Recorder
 
+- More details about the approach take a look in our [wiki](https://github.com/gabrielbmoro/screen-share-recorder/wiki)
+
 ### Use case
 
 - Record the screen
@@ -27,6 +29,5 @@ This handler will manage a common surface between `MediaCodec` and `VirtualDispl
 - To record your screen you just need to tap in Start button, the Stop button will be enabled after you start a recording. Currently we are saving the recording in the directory *DCIM*.
 
 - Currently we don't have support for high resolutions, so you can face crashes related to that.
-
 
 ![Teaser](img/Screen-Recording-2023-05-28-at-19.24.51.gif)
