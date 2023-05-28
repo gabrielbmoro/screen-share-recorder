@@ -21,3 +21,9 @@ Also, `RecordHandler` has the stop recording action.
 - `RecordHandler` 🎥
 
 This handler will manage a common surface between `MediaCodec` and `VirtualDisplay`. While `VirtualDisplay` is filling the surface with data created by the screen share, the `MediaCodec` and `MediaMuxer` are creating a file with the video information. All this logic is under `RecordHandler` control.
+
+### Run
+
+- To record your screen you just need to tap in Start button, the Stop button will be enabled after you start a recording. Currently we are saving the recording in the directory *DCIM*.
+
+- Currently we don't have support for high resolutions, so you can face crashes related to that.
