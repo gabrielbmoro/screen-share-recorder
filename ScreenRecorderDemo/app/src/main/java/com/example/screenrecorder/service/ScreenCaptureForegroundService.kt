@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
-import android.os.Environment
 import android.os.HandlerThread
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
