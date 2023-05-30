@@ -26,8 +26,6 @@ This handler will manage a common surface between `MediaCodec` and `VirtualDispl
 
 ### Run
 
-- To record your screen you just need to tap in Start button, the Stop button will be enabled after you start a recording. Currently we are saving the recording in the directory *DCIM*.
-
-- Currently we don't have support for high resolutions, so you can face crashes related to that.
+- To record your screen you just need to tap in Start button, the Stop button will be enabled after you start a recording. Currently we are saving the recording in a internal app directory -> */data/data/com.example.screenrecorder/files/recorded.mp4*. You can open the file using *Android Studio Device Explorer*.
 
 ![Teaser](img/Screen-Recording-2023-05-28-at-19.24.51.gif)

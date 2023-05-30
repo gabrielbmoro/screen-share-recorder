@@ -37,10 +37,11 @@ class ScreenCaptureForegroundService : Service() {
 
                 recordThread.start()
 
+                val outputFile = applicationContext.filesDir.absolutePath + File.separator + "recorded.mp4"
                 this.recordHandler = RecordHandler(
                     recordThread.looper,
                     mediaProjection,
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + File.separator + "recorded.mp4",
+                    outputFile,
                     resources.displayMetrics
                 )
                 this.recordHandler?.handleMessage(RecordHandler.startMessage())
