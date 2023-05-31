@@ -13,12 +13,14 @@ import android.os.Message
 import android.util.DisplayMetrics
 import android.view.Surface
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 
 class RecordHandler(
     looper: Looper,
     private val mediaProjection: MediaProjection,
     private val outputFile: String,
     private val displayMetrics: DisplayMetrics,
+    private val callback: Callback
 ) : Handler(looper) {
 
     private val mediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -42,7 +44,7 @@ class RecordHandler(
     private var virtualDisplay: VirtualDisplay? = null
 
     private var videoTrackIndex: Int? = null
-    private var isRecording: Boolean = false
+    private val isRecording = AtomicBoolean(false)
 
     private fun setupMediaCodec() {
         // Configure the MediaCodec encoder with the MediaFormat
@@ -77,6 +79,9 @@ class RecordHandler(
                             mediaCodec.release()
                             mediaMuxer.stop()
                             mediaMuxer.release()
+
+                            isRecording.set(false)
+                            callback.onRecordStopped()
                         }
                     }
                 }
@@ -84,8 +89,8 @@ class RecordHandler(
 
             override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
                 Timber.d("onError -> $e")
-                e.printStackTrace()
-
+                isRecording.set(false)
+                callback.onRecordError(e)
                 // Error occurred during encoding, handle accordingly
             }
 
@@ -93,62 +98,75 @@ class RecordHandler(
                 Timber.d("onOutputFormatChanged")
                 videoTrackIndex = mediaMuxer.addTrack(format)
                 mediaMuxer.start()
-                isRecording = true
+                isRecording.set(true)
+                callback.onRecordStarted()
             }
-        }, null)
+        }, this)
 
         mediaMuxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         videoTrackIndex = null
-        isRecording = false
+
         // Create a surface from the MediaCodec encoder
         surface = mediaCodec.createInputSurface()
     }
 
     override fun handleMessage(msg: Message) {
         when (msg.what) {
-            START_RECORD_MESSAGE -> {
-                post {
-                    setupMediaCodec()
-
-                    virtualDisplay = mediaProjection.createVirtualDisplay(
-                        "virtual display",
-                        displayMetrics.widthPixels,
-                        displayMetrics.heightPixels,
-                        displayMetrics.densityDpi,
-                        DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                        surface,
-                        object : VirtualDisplay.Callback() {
-                            override fun onPaused() {
-                                Timber.d("Virtual display - onPaused")
-                            }
-
-                            override fun onResumed() {
-                                // Start the MediaCodec encoder
-                                Timber.d("Virtual display - onResume")
-                                mediaCodec.start()
-                            }
-
-                            override fun onStopped() {
-                                Timber.d("Virtual display - onStopped")
-                            }
-                        },
-                        null
-                    )
-                }
-            }
-
-            STOP_RECORD_MESSAGE -> {
-                stopRecording()
-            }
+            START_RECORD_MESSAGE -> handleStartRecordMessage()
+            STOP_RECORD_MESSAGE -> handleStopRecordMessage()
         }
     }
 
-    private fun stopRecording() {
-        mediaCodec.signalEndOfInputStream()
+    private fun handleStartRecordMessage() {
+        setupMediaCodec()
+
+        virtualDisplay = mediaProjection.createVirtualDisplay(
+            "virtual display",
+            displayMetrics.widthPixels,
+            displayMetrics.heightPixels,
+            displayMetrics.densityDpi,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            surface,
+            object : VirtualDisplay.Callback() {
+                override fun onPaused() {
+                    Timber.d("Virtual display - onPaused")
+                }
+
+                override fun onResumed() {
+                    // Start the MediaCodec encoder
+                    Timber.d("Virtual display - onResume")
+                    mediaCodec.start()
+                }
+
+                override fun onStopped() {
+                    Timber.d("Virtual display - onStopped")
+                    try {
+                        if (isRecording.get()) {
+                            mediaCodec.signalEndOfInputStream()
+                        } else {
+                            throw IllegalStateException("Record should stop now")
+                        }
+                    } catch (exception: Exception) {
+                        callback.onRecordError(exception)
+                    }
+                }
+            },
+            this
+        )
+    }
+
+    private fun handleStopRecordMessage() {
         mediaProjection.stop()
         virtualDisplay?.release()
         virtualDisplay = null
         surface = null
+    }
+
+    interface Callback {
+        fun onRecordError(exception: Exception)
+        fun onRecordStopped()
+
+        fun onRecordStarted()
     }
 
     companion object {

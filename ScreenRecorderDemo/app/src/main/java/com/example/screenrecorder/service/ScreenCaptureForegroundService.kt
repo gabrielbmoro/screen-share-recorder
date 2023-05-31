@@ -10,11 +10,12 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.HandlerThread
 import android.os.IBinder
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.screenrecorder.R
 import java.io.File
 
-class ScreenCaptureForegroundService : Service() {
+class ScreenCaptureForegroundService : Service(), RecordHandler.Callback {
 
     private var recordHandler: RecordHandler? = null
     private val recordThread: HandlerThread = HandlerThread("record handler")
@@ -32,16 +33,19 @@ class ScreenCaptureForegroundService : Service() {
 
                 val resultCode = intent.getIntExtra(RESULT_CODE_KEY, Activity.RESULT_CANCELED)
                 val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
-                val mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
+                val mediaProjection =
+                    mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
 
                 recordThread.start()
 
-                val outputFile = applicationContext.filesDir.absolutePath + File.separator + "recorded.mp4"
+                val outputFile =
+                    applicationContext.filesDir.absolutePath + File.separator + System.currentTimeMillis() + ".mp4"
                 this.recordHandler = RecordHandler(
                     recordThread.looper,
                     mediaProjection,
                     outputFile,
-                    resources.displayMetrics
+                    resources.displayMetrics,
+                    this@ScreenCaptureForegroundService
                 )
                 this.recordHandler?.handleMessage(RecordHandler.startMessage())
 
@@ -50,13 +54,23 @@ class ScreenCaptureForegroundService : Service() {
 
             STOP_RECORDING_INTENT_ACTION -> {
                 this.recordHandler?.handleMessage(RecordHandler.stopMessage())
-
-                stopSelf()
                 return START_NOT_STICKY
             }
 
             else -> return START_STICKY
         }
+    }
+
+    override fun onRecordError(exception: Exception) {
+        Toast.makeText(this, "Error...", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onRecordStopped() {
+        Toast.makeText(this, "Recorded saved...", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onRecordStarted() {
+        Toast.makeText(this, "Recorded starting...", Toast.LENGTH_SHORT).show()
     }
 
     private fun baseNotification(): Notification {
