@@ -12,11 +12,12 @@ import android.os.Looper
 import android.os.Message
 import android.util.DisplayMetrics
 import android.view.Surface
+import timber.log.Timber
 
 class RecordHandler(
     looper: Looper,
     private val mediaProjection: MediaProjection,
-    outputFile: String,
+    private val outputFile: String,
     private val displayMetrics: DisplayMetrics,
 ) : Handler(looper) {
 
@@ -34,22 +35,73 @@ class RecordHandler(
         )
         setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
     }
-    private val mediaMuxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-    private val bufferInfo = MediaCodec.BufferInfo()
+    private lateinit var mediaMuxer: MediaMuxer
 
     private var surface: Surface? = null
 
     private var virtualDisplay: VirtualDisplay? = null
 
+    private var videoTrackIndex: Int? = null
+    private var isRecording: Boolean = false
+
     private fun setupMediaCodec() {
         // Configure the MediaCodec encoder with the MediaFormat
         mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
 
+        // Set callbacks
+        mediaCodec.setCallback(object : MediaCodec.Callback() {
+            override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+                Timber.d("onInputBufferAvailable")
+            }
+
+            override fun onOutputBufferAvailable(
+                codec: MediaCodec,
+                index: Int,
+                info: MediaCodec.BufferInfo
+            ) {
+                Timber.d("onOutputBufferAvailable")
+                // Output buffer is available for processing
+                if (videoTrackIndex != null) {
+                    codec.getOutputBuffer(index)?.let { outputBuffer ->
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && info.size > 0) {
+                            // Write the encoded data to the MediaMuxer if it's initialized and the buffer is valid
+                            Timber.d("write the encoded data")
+                            outputBuffer.position(info.offset)
+                            outputBuffer.limit(info.offset + info.size)
+                            mediaMuxer.writeSampleData(videoTrackIndex!!, outputBuffer, info)
+                        }
+                        codec.releaseOutputBuffer(index, false)
+
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                            mediaCodec.stop()
+                            mediaCodec.release()
+                            mediaMuxer.stop()
+                            mediaMuxer.release()
+                        }
+                    }
+                }
+            }
+
+            override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
+                Timber.d("onError -> $e")
+                e.printStackTrace()
+
+                // Error occurred during encoding, handle accordingly
+            }
+
+            override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+                Timber.d("onOutputFormatChanged")
+                videoTrackIndex = mediaMuxer.addTrack(format)
+                mediaMuxer.start()
+                isRecording = true
+            }
+        }, null)
+
+        mediaMuxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        videoTrackIndex = null
+        isRecording = false
         // Create a surface from the MediaCodec encoder
         surface = mediaCodec.createInputSurface()
-
-        // Start the MediaCodec encoder
-        mediaCodec.start()
     }
 
     override fun handleMessage(msg: Message) {
@@ -65,64 +117,39 @@ class RecordHandler(
                         displayMetrics.densityDpi,
                         DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                         surface,
-                        null,
+                        object : VirtualDisplay.Callback() {
+                            override fun onPaused() {
+                                Timber.d("Virtual display - onPaused")
+                            }
+
+                            override fun onResumed() {
+                                // Start the MediaCodec encoder
+                                Timber.d("Virtual display - onResume")
+                                mediaCodec.start()
+                            }
+
+                            override fun onStopped() {
+                                Timber.d("Virtual display - onStopped")
+                            }
+                        },
                         null
                     )
-                    recordSurface()
                 }
             }
 
             STOP_RECORD_MESSAGE -> {
-                mediaCodec.signalEndOfInputStream()
-                mediaProjection.stop()
-                virtualDisplay?.release()
-                virtualDisplay = null
-                surface = null
+                stopRecording()
             }
         }
     }
 
-
-    private fun recordSurface() {
-        var videoTrackIndex: Int? = null
-
-        while (true) {
-            val encoderStatus = mediaCodec.dequeueOutputBuffer(bufferInfo, -1)
-            when {
-                // No output available yet, wait for the next buffer
-                encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    continue
-                }
-
-                // The format of the output has changed (e.g., for the first frame), get the new format
-                encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    val newFormat = mediaCodec.outputFormat
-                    videoTrackIndex = mediaMuxer.addTrack(newFormat)
-                    mediaMuxer.start()
-                }
-
-                // Encode and write the buffer to the MediaMuxer
-                (encoderStatus >= 0) -> {
-                    mediaCodec.getOutputBuffer(encoderStatus)?.let { encodedData ->
-                        encodedData.position(bufferInfo.offset)
-                        encodedData.limit(bufferInfo.offset + bufferInfo.size)
-                        mediaMuxer.writeSampleData(videoTrackIndex!!, encodedData, bufferInfo)
-                    }
-
-                    mediaCodec.releaseOutputBuffer(encoderStatus, false)
-
-                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        mediaCodec.stop()
-                        mediaCodec.release()
-                        mediaMuxer.stop()
-                        mediaMuxer.release()
-                        return
-                    }
-                }
-            }
-        }
+    private fun stopRecording() {
+        mediaCodec.signalEndOfInputStream()
+        mediaProjection.stop()
+        virtualDisplay?.release()
+        virtualDisplay = null
+        surface = null
     }
-
 
     companion object {
         private const val START_RECORD_MESSAGE = 0
