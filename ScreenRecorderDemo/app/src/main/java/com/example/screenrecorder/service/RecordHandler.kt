@@ -50,10 +50,12 @@ class RecordHandler(
         // Configure the MediaCodec encoder with the MediaFormat
         mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
 
+        Timber.d("Media codec -> configured")
+
         // Set callbacks
         mediaCodec.setCallback(object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
-                Timber.d("onInputBufferAvailable")
+                Timber.d("Media codec -> Callback -> onInputBufferAvailable")
             }
 
             override fun onOutputBufferAvailable(
@@ -61,7 +63,7 @@ class RecordHandler(
                 index: Int,
                 info: MediaCodec.BufferInfo
             ) {
-                Timber.d("onOutputBufferAvailable")
+                Timber.d("Media codec -> Callback -> onOutputBufferAvailable")
                 // Output buffer is available for processing
                 if (videoTrackIndex != null) {
                     codec.getOutputBuffer(index)?.let { outputBuffer ->
@@ -75,6 +77,8 @@ class RecordHandler(
                         codec.releaseOutputBuffer(index, false)
 
                         if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                            Timber.d("Media codec -> Callback -> onOutputBufferAvailable -> end of stream")
+
                             mediaCodec.stop()
                             mediaCodec.release()
                             mediaMuxer.stop()
@@ -88,14 +92,15 @@ class RecordHandler(
             }
 
             override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
-                Timber.d("onError -> $e")
+                Timber.d("Media codec -> Callback -> onError $e")
                 isRecording.set(false)
                 callback.onRecordError(e)
                 // Error occurred during encoding, handle accordingly
             }
 
             override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-                Timber.d("onOutputFormatChanged")
+                Timber.d("Media codec -> Callback -> onOutputFormatChanged $format")
+
                 videoTrackIndex = mediaMuxer.addTrack(format)
                 mediaMuxer.start()
                 isRecording.set(true)
@@ -108,6 +113,7 @@ class RecordHandler(
 
         // Create a surface from the MediaCodec encoder
         surface = mediaCodec.createInputSurface()
+        Timber.d("Media codec -> surface created")
     }
 
     override fun handleMessage(msg: Message) {
@@ -129,17 +135,17 @@ class RecordHandler(
             surface,
             object : VirtualDisplay.Callback() {
                 override fun onPaused() {
-                    Timber.d("Virtual display - onPaused")
+                    Timber.d("Virtual display -> onPaused")
                 }
 
                 override fun onResumed() {
                     // Start the MediaCodec encoder
-                    Timber.d("Virtual display - onResume")
+                    Timber.d("Virtual display -> onResume")
                     mediaCodec.start()
                 }
 
                 override fun onStopped() {
-                    Timber.d("Virtual display - onStopped")
+                    Timber.d("Virtual display -> onStopped")
                 }
             },
             this
@@ -156,6 +162,7 @@ class RecordHandler(
         try {
             if (isRecording.get()) {
                 mediaCodec.signalEndOfInputStream()
+                Timber.d("Media codec -> signal of end of input stream sent")
             } else {
                 throw IllegalStateException("Record should stop now")
             }
