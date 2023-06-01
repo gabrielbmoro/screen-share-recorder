@@ -140,15 +140,6 @@ class RecordHandler(
 
                 override fun onStopped() {
                     Timber.d("Virtual display - onStopped")
-                    try {
-                        if (isRecording.get()) {
-                            mediaCodec.signalEndOfInputStream()
-                        } else {
-                            throw IllegalStateException("Record should stop now")
-                        }
-                    } catch (exception: Exception) {
-                        callback.onRecordError(exception)
-                    }
                 }
             },
             this
@@ -158,8 +149,19 @@ class RecordHandler(
     private fun handleStopRecordMessage() {
         mediaProjection.stop()
         virtualDisplay?.release()
+
         virtualDisplay = null
         surface = null
+
+        try {
+            if (isRecording.get()) {
+                mediaCodec.signalEndOfInputStream()
+            } else {
+                throw IllegalStateException("Record should stop now")
+            }
+        } catch (exception: Exception) {
+            callback.onRecordError(exception)
+        }
     }
 
     interface Callback {
