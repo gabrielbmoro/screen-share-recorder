@@ -9,11 +9,12 @@ import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.IBinder
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.screenrecorder.R
 import java.io.File
 
-class ScreenCaptureForegroundService : Service() {
+class ScreenCaptureForegroundService : Service(), RecordManager.Callback {
 
     private var recordManager: RecordManager? = null
 
@@ -44,7 +45,8 @@ class ScreenCaptureForegroundService : Service() {
                 this.recordManager = RecordManager(
                     mediaProjection,
                     resources.displayMetrics,
-                    outputFile
+                    outputFile,
+                    this@ScreenCaptureForegroundService
                 )
                 this.recordManager?.start(applicationContext)
                 return START_STICKY
@@ -79,6 +81,18 @@ class ScreenCaptureForegroundService : Service() {
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
+    }
+
+    override fun onRecordStarted() {
+        Toast.makeText(this, "Record started", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onRecordSaved() {
+        Toast.makeText(this, "Record successfully saved", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onError(exception: Exception) {
+        Toast.makeText(this, "Error...", Toast.LENGTH_SHORT).show()
     }
 
     companion object {

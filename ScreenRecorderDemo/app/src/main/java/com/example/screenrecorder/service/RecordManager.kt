@@ -9,12 +9,12 @@ import android.os.Build
 import android.util.DisplayMetrics
 import android.view.Surface
 import timber.log.Timber
-import java.lang.RuntimeException
 
 class RecordManager(
     private val mediaProjection: MediaProjection,
     private val displayMetrics: DisplayMetrics,
-    private val outputFile: String
+    private val outputFile: String,
+    private val callback: Callback
 ) {
 
     private var mediaRecorder: MediaRecorder? = null
@@ -22,44 +22,46 @@ class RecordManager(
     private var surface: Surface? = null
 
     fun start(context: Context) {
-        mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(context)
-        } else MediaRecorder()
+        try {
+            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else MediaRecorder()
 
-        mediaRecorder!!.setVideoSource(MediaRecorder.VideoSource.SURFACE)
-        mediaRecorder!!.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        mediaRecorder!!.setOutputFile(outputFile)
-        mediaRecorder!!.setVideoSize(displayMetrics.widthPixels, displayMetrics.heightPixels)
-        mediaRecorder!!.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+            mediaRecorder!!.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+            mediaRecorder!!.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            mediaRecorder!!.setOutputFile(outputFile)
+            mediaRecorder!!.setVideoSize(displayMetrics.widthPixels, displayMetrics.heightPixels)
+            mediaRecorder!!.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
 
-        mediaRecorder!!.prepare()
+            mediaRecorder!!.prepare()
 
-        surface = mediaRecorder!!.surface
+            surface = mediaRecorder!!.surface
 
-        virtualDisplay = mediaProjection.createVirtualDisplay(
-            "virtual display",
-            displayMetrics.widthPixels,
-            displayMetrics.heightPixels,
-            displayMetrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            surface,
-            object : VirtualDisplay.Callback() {
-                override fun onPaused() {
-                    Timber.d("Virtual display -> onPaused")
-                }
+            virtualDisplay = mediaProjection.createVirtualDisplay(
+                "virtual display",
+                displayMetrics.widthPixels,
+                displayMetrics.heightPixels,
+                displayMetrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                surface,
+                object : VirtualDisplay.Callback() {
+                    override fun onPaused() { }
 
-                override fun onResumed() {
-                    // Start the MediaCodec encoder
-                    Timber.d("Virtual display -> onResume")
-                    mediaRecorder!!.start()
-                }
+                    override fun onResumed() {
+                        mediaRecorder!!.start()
 
-                override fun onStopped() {
-                    Timber.d("Virtual display -> onStopped")
-                }
-            },
-            null
-        )
+                        Timber.d("record started")
+                        callback.onRecordStarted()
+                    }
+
+                    override fun onStopped() { }
+                },
+                null
+            )
+        } catch (exception: Exception) {
+            Timber.e("record error", exception)
+            callback.onError(exception)
+        }
     }
 
     fun stop() {
@@ -71,8 +73,19 @@ class RecordManager(
             virtualDisplay?.release()
             virtualDisplay = null
             mediaProjection.stop()
-        } catch (runtimeException: RuntimeException) {
-            Timber.e(runtimeException)
+
+            Timber.d("record saved")
+            callback.onRecordSaved()
+        } catch (exception: Exception) {
+            callback.onError(exception)
         }
+    }
+
+    interface Callback {
+        fun onRecordStarted()
+
+        fun onRecordSaved()
+
+        fun onError(exception: Exception)
     }
 }
