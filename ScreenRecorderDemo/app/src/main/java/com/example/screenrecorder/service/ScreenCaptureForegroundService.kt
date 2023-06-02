@@ -8,17 +8,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
-import android.os.HandlerThread
 import android.os.IBinder
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.screenrecorder.R
 import java.io.File
 
-class ScreenCaptureForegroundService : Service(), RecordHandler.Callback {
+class ScreenCaptureForegroundService : Service() {
 
-    private var recordHandler: RecordHandler? = null
-    private val recordThread: HandlerThread = HandlerThread("record handler")
+    private var recordManager: RecordManager? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -33,44 +30,34 @@ class ScreenCaptureForegroundService : Service(), RecordHandler.Callback {
 
                 val resultCode = intent.getIntExtra(RESULT_CODE_KEY, Activity.RESULT_CANCELED)
                 val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
-                val mediaProjection =
-                    mediaProjectionManager.getMediaProjection(resultCode, resultData!!)
-
-                recordThread.start()
-
-                val outputFile =
-                    applicationContext.filesDir.absolutePath + File.separator + System.currentTimeMillis() + ".mp4"
-                this.recordHandler = RecordHandler(
-                    recordThread.looper,
-                    mediaProjection,
-                    outputFile,
-                    resources.displayMetrics,
-                    this@ScreenCaptureForegroundService
+                val mediaProjection = mediaProjectionManager.getMediaProjection(
+                    resultCode,
+                    resultData!!
                 )
-                this.recordHandler?.handleMessage(RecordHandler.startMessage())
 
+
+                val outputFile = applicationContext.filesDir.absolutePath +
+                        File.separator +
+                        System.currentTimeMillis() +
+                        ".mp4"
+
+                this.recordManager = RecordManager(
+                    mediaProjection,
+                    resources.displayMetrics,
+                    outputFile
+                )
+                this.recordManager?.start(applicationContext)
                 return START_STICKY
             }
 
             STOP_RECORDING_INTENT_ACTION -> {
-                this.recordHandler?.handleMessage(RecordHandler.stopMessage())
+                this.recordManager?.stop()
+                this.recordManager = null
                 return START_NOT_STICKY
             }
 
             else -> return START_STICKY
         }
-    }
-
-    override fun onRecordError(exception: Exception) {
-        Toast.makeText(this, "Error...", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onRecordStopped() {
-        Toast.makeText(this, "Recorded saved...", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onRecordStarted() {
-        Toast.makeText(this, "Recorded starting...", Toast.LENGTH_SHORT).show()
     }
 
     private fun baseNotification(): Notification {
@@ -91,10 +78,6 @@ class ScreenCaptureForegroundService : Service(), RecordHandler.Callback {
 
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
-
-        recordThread.quitSafely()
-        recordHandler = null
-
         super.onDestroy()
     }
 
