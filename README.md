@@ -1,3 +1,5 @@
+## Screen Share Recorder
+
 ### Use case
 
 - Record the screen
