@@ -1,7 +1,3 @@
-# Screen Share Recorder
-
-- More details about the approach take a look in our [wiki](https://github.com/gabrielbmoro/screen-share-recorder/wiki)
-
 ### Use case
 
 - Record the screen
