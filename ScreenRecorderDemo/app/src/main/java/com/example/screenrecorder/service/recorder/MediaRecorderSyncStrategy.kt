@@ -131,14 +131,15 @@ class RecorderSyncHandler(
 
 
 class MediaRecorderSyncStrategy : MediaRecorderStrategy {
-    private val handlerThread = HandlerThread("video_recorder_thread")
+    private var handlerThread: HandlerThread? = null
     private var recorderSyncHandler: RecorderSyncHandler? = null
 
     override fun setup(outputFile: String, widthPixels: Int, heightPixels: Int) {
-        handlerThread.start()
+        handlerThread = HandlerThread("video_recorder_thread")
+        handlerThread!!.start()
 
         recorderSyncHandler = RecorderSyncHandler(
-            looper = handlerThread.looper,
+            looper = handlerThread!!.looper,
             outputFile = outputFile,
             widthPixels = widthPixels,
             heightPixels = heightPixels
@@ -151,10 +152,12 @@ class MediaRecorderSyncStrategy : MediaRecorderStrategy {
 
     override fun stop() {
         recorderSyncHandler?.handleMessage(Message().apply { what = STOP_RECORD_MESSAGE })
+        handlerThread?.quitSafely()
     }
 
     override fun release() {
         recorderSyncHandler = null
+        handlerThread = null
     }
 
     override fun getSurface(): Surface? = recorderSyncHandler?.getSurface()
