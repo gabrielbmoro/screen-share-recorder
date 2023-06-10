@@ -22,31 +22,15 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
 
     override fun onBind(intent: Intent?): IBinder = binder
 
-    private fun baseNotification(): Notification {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Foreground Service",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
-
-        return NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("Screen share")
-            .setContentText("Running Media projection...")
-            .setSmallIcon(R.drawable.ic_warning)
-            .build()
-    }
-
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
-    override fun start(resultCode: Int, resultData: Intent, recorderMode: RecorderMode) {
+    override fun startRecorder(resultCode: Int, resultData: Intent, recorderMode: RecorderMode) {
         val notification = baseNotification()
 
-        startForeground(1, notification)
+        startForeground(NOTIFICATION_ID, notification)
 
         val mediaProjectionManager = getSystemService(MediaProjectionManager::class.java)
 
@@ -96,11 +80,27 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
         this.recordManager?.start(applicationContext, strategy = recorderMode)
     }
 
-    override fun stop() {
+    override fun stopRecorder() {
         this.recordManager?.stop()
         this.recordManager = null
 
         stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    private fun baseNotification(): Notification {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Foreground Service",
+            NotificationManager.IMPORTANCE_DEFAULT
+        )
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+
+        return NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+            .setContentTitle("Screen share")
+            .setContentText("Running Media projection...")
+            .setSmallIcon(R.drawable.ic_warning)
+            .build()
     }
 
     inner class ScreenCaptureBinder : Binder() {
@@ -109,6 +109,7 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
     }
 
     companion object {
-        const val CHANNEL_ID = "ScreenCaptureServiceChannel"
+        private const val CHANNEL_ID = "ScreenCaptureServiceChannel"
+        private const val NOTIFICATION_ID = 12
     }
 }

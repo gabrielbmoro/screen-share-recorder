@@ -8,7 +8,7 @@ enum class RecorderMode {
 
 interface ScreenCaptureInterface {
 
-    fun start(resultCode: Int, resultData: Intent, recorderMode: RecorderMode)
+    fun startRecorder(resultCode: Int, resultData: Intent, recorderMode: RecorderMode)
 
-    fun stop()
+    fun stopRecorder()
 }

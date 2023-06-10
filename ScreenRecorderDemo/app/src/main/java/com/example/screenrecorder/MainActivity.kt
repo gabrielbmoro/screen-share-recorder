@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 screenSharePermissionResult = result
                 if (screenSharePermissionResult?.resultCode == RESULT_OK && screenSharePermissionResult?.data != null) {
-                    screenCaptureContract?.start(
+                    screenCaptureContract?.startRecorder(
                         resultCode = screenSharePermissionResult!!.resultCode,
                         resultData = screenSharePermissionResult!!.data!!,
                         recorderMode = RecorderMode.SYNC
@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        screenCaptureContract?.stop()
+        screenCaptureContract?.stopRecorder()
 
         isRecording = false
         syncButtonsUI()
