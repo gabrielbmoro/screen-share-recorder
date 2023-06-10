@@ -99,6 +99,8 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
     override fun stop() {
         this.recordManager?.stop()
         this.recordManager = null
+
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     inner class ScreenCaptureBinder : Binder() {
