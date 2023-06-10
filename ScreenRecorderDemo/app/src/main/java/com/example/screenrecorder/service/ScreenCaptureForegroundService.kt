@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Binder
+import android.os.Environment
 import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -54,7 +55,10 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
             resultData
         )
 
-        val outputFile = applicationContext.filesDir.absolutePath +
+        val outputFile = Environment
+            .getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS
+            ).absolutePath +
                 File.separator +
                 System.currentTimeMillis() +
                 "_${recorderMode.name}.mp4"
