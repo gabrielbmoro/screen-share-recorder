@@ -7,9 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Binder
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.screenrecorder.R
@@ -59,7 +57,7 @@ class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
         val outputFile = applicationContext.filesDir.absolutePath +
                 File.separator +
                 System.currentTimeMillis() +
-                ".mp4"
+                "_${recorderMode.name}.mp4"
 
         this.recordManager = RecordManager(
             mediaProjection,

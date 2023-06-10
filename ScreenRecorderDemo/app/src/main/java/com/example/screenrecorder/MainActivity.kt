@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
                     screenCaptureContract?.start(
                         resultCode = screenSharePermissionResult!!.resultCode,
                         resultData = screenSharePermissionResult!!.data!!,
-                        recorderMode = RecorderMode.SYNC
+                        recorderMode = RecorderMode.ASYNC
                     )
                 }
             }
