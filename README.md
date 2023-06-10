@@ -4,6 +4,8 @@
 
 - Record the screen
 
+![Image](img/screen_recorder_flow.jpg)
+
 ---
 
 ## Components
