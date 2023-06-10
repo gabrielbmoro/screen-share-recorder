@@ -1,16 +1,20 @@
-package com.example.screenrecorder.activity
+package com.example.screenrecorder
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
 import android.media.projection.MediaProjectionManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.IBinder
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import com.example.screenrecorder.R
+import com.example.screenrecorder.service.RecorderMode
 import com.example.screenrecorder.service.ScreenCaptureForegroundService
+import com.example.screenrecorder.service.ScreenCaptureInterface
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,6 +24,20 @@ class MainActivity : AppCompatActivity() {
     private var screenSharePermissionResult: ActivityResult? = null
 
     private var isRecording = false
+
+    private var screenCaptureContract: ScreenCaptureInterface? = null
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? ScreenCaptureForegroundService.ScreenCaptureBinder
+            screenCaptureContract = binder?.contract
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            screenCaptureContract = null
+        }
+
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,12 +52,11 @@ class MainActivity : AppCompatActivity() {
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 screenSharePermissionResult = result
                 if (screenSharePermissionResult?.resultCode == RESULT_OK && screenSharePermissionResult?.data != null) {
-                    val serviceIntent = ScreenCaptureForegroundService.createStartRecordingIntent(
-                        context = this,
+                    screenCaptureContract?.start(
                         resultCode = screenSharePermissionResult!!.resultCode,
-                        resultData = screenSharePermissionResult!!.data!!
+                        resultData = screenSharePermissionResult!!.data!!,
+                        recorderMode = RecorderMode.SYNC
                     )
-                    startForegroundService(serviceIntent)
                 }
             }
 
@@ -52,6 +69,12 @@ class MainActivity : AppCompatActivity() {
         stopButton.setOnClickListener {
             stopRecording()
         }
+
+        bindService(
+            Intent(this, ScreenCaptureForegroundService::class.java),
+            serviceConnection,
+            BIND_AUTO_CREATE
+        )
     }
 
     private fun startRecording(launcher: ActivityResultLauncher<Intent>) {
@@ -62,8 +85,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        val serviceIntent = ScreenCaptureForegroundService.createStopRecordingIntent(this)
-        startService(serviceIntent)
+        screenCaptureContract?.stop()
 
         isRecording = false
         syncButtonsUI()
@@ -75,6 +97,9 @@ class MainActivity : AppCompatActivity() {
 
             Toast.makeText(this, "Recording was saved...", Toast.LENGTH_SHORT).show()
         }
+
+        unbindService(serviceConnection)
+
         super.onDestroy()
     }
 

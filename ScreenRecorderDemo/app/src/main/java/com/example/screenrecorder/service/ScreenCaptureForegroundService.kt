@@ -1,66 +1,27 @@
 package com.example.screenrecorder.service
 
-import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.screenrecorder.R
+import com.example.screenrecorder.service.recorder.RecordManager
 import java.io.File
 
-class ScreenCaptureForegroundService : Service(), RecordManager.Callback {
+class ScreenCaptureForegroundService : Service(), ScreenCaptureInterface {
 
     private var recordManager: RecordManager? = null
+    private val binder: IBinder = ScreenCaptureBinder()
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            START_RECORDING_INTENT_ACTION -> {
-                val notification = baseNotification()
-
-                startForeground(1, notification)
-
-                val mediaProjectionManager = getSystemService(MediaProjectionManager::class.java)
-
-                val resultCode = intent.getIntExtra(RESULT_CODE_KEY, Activity.RESULT_CANCELED)
-                val resultData = intent.getParcelableExtra<Intent>(RESULT_DATA_KEY)
-                val mediaProjection = mediaProjectionManager.getMediaProjection(
-                    resultCode,
-                    resultData!!
-                )
-
-
-                val outputFile = applicationContext.filesDir.absolutePath +
-                        File.separator +
-                        System.currentTimeMillis() +
-                        ".mp4"
-
-                this.recordManager = RecordManager(
-                    mediaProjection,
-                    resources.displayMetrics,
-                    outputFile,
-                    this@ScreenCaptureForegroundService
-                )
-                this.recordManager?.start(applicationContext)
-                return START_STICKY
-            }
-
-            STOP_RECORDING_INTENT_ACTION -> {
-                this.recordManager?.stop()
-                this.recordManager = null
-                return START_NOT_STICKY
-            }
-
-            else -> return START_STICKY
-        }
-    }
+    override fun onBind(intent: Intent?): IBinder = binder
 
     private fun baseNotification(): Notification {
         val channel = NotificationChannel(
@@ -83,44 +44,67 @@ class ScreenCaptureForegroundService : Service(), RecordManager.Callback {
         super.onDestroy()
     }
 
-    override fun onRecordStarted() {
-        Toast.makeText(this, "Record started", Toast.LENGTH_SHORT).show()
+    override fun start(resultCode: Int, resultData: Intent, recorderMode: RecorderMode) {
+        val notification = baseNotification()
+
+        startForeground(1, notification)
+
+        val mediaProjectionManager = getSystemService(MediaProjectionManager::class.java)
+
+        val mediaProjection = mediaProjectionManager.getMediaProjection(
+            resultCode,
+            resultData
+        )
+
+        val outputFile = applicationContext.filesDir.absolutePath +
+                File.separator +
+                System.currentTimeMillis() +
+                ".mp4"
+
+        this.recordManager = RecordManager(
+            mediaProjection,
+            resources.displayMetrics,
+            outputFile,
+            object : RecordManager.Callback {
+                override fun onRecordStarted() {
+                    Toast.makeText(
+                        this@ScreenCaptureForegroundService,
+                        "Record started",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                override fun onRecordSaved() {
+                    Toast.makeText(
+                        this@ScreenCaptureForegroundService,
+                        "Record successfully saved",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                override fun onError(exception: Exception) {
+                    Toast.makeText(
+                        this@ScreenCaptureForegroundService,
+                        "Error...",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
+        this.recordManager?.start(applicationContext, strategy = recorderMode)
     }
 
-    override fun onRecordSaved() {
-        Toast.makeText(this, "Record successfully saved", Toast.LENGTH_SHORT).show()
+    override fun stop() {
+        this.recordManager?.stop()
+        this.recordManager = null
     }
 
-    override fun onError(exception: Exception) {
-        Toast.makeText(this, "Error...", Toast.LENGTH_SHORT).show()
+    inner class ScreenCaptureBinder : Binder() {
+        val contract: ScreenCaptureInterface
+            get() = this@ScreenCaptureForegroundService
     }
 
     companion object {
         const val CHANNEL_ID = "ScreenCaptureServiceChannel"
-        private const val START_RECORDING_INTENT_ACTION = "start_recording"
-        private const val STOP_RECORDING_INTENT_ACTION = "stop_recording"
-        private const val RESULT_CODE_KEY = "resultCodeKey"
-        private const val RESULT_DATA_KEY = "resultDataKey"
-
-        fun createStartRecordingIntent(
-            context: Context,
-            resultCode: Int,
-            resultData: Intent
-        ): Intent {
-            return Intent(context, ScreenCaptureForegroundService::class.java).apply {
-                putExtra(RESULT_CODE_KEY, resultCode)
-                putExtra(RESULT_DATA_KEY, resultData)
-
-                action = START_RECORDING_INTENT_ACTION
-            }
-        }
-
-        fun createStopRecordingIntent(
-            context: Context
-        ): Intent {
-            return Intent(context, ScreenCaptureForegroundService::class.java).apply {
-                action = STOP_RECORDING_INTENT_ACTION
-            }
-        }
     }
 }
